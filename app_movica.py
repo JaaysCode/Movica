@@ -9,6 +9,17 @@ import plotly.graph_objects as go
 # Configuración de la página
 st.set_page_config(page_title="Movica | Simulador", page_icon="🚌", layout="wide")
 
+# Ocultar el menú de Streamlit, el ícono de GitHub y el pie de página
+ocultar_menu = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .viewerBadge_container__1QSob {display: none;}
+    </style>
+"""
+st.markdown(ocultar_menu, unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # 1. FUNCIÓN DE CONTRASEÑA
 # -----------------------------------------------------------------------------
