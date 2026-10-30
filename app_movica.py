@@ -42,6 +42,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
+# AUTENTICACIÓN Y SEGURIDAD
+# -----------------------------------------------------------------------------
+def check_password():
+    def password_entered():
+        if st.session_state["pwd_input"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["pwd_input"] 
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.markdown("<h3 style='color: #186663;'>Acceso Restringido - Tesorería Servitravel</h3>", unsafe_allow_html=True)
+        st.text_input("Ingrese la clave corporativa", type="password", on_change=password_entered, key="pwd_input")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.markdown("<h3 style='color: #186663;'>Acceso Restringido - Tesorería Servitravel</h3>", unsafe_allow_html=True)
+        st.text_input("Ingrese la clave corporativa", type="password", on_change=password_entered, key="pwd_input")
+        st.error("Credenciales incorrectas.")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
+    
+# -----------------------------------------------------------------------------
 # 2. INGESTA DE DATOS HISTÓRICOS Y CONSTANTES
 # -----------------------------------------------------------------------------
 MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago']
