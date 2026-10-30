@@ -137,7 +137,6 @@ st.markdown("<div class='sub-header'>Plataforma analítica para Servitravel enfo
 
 st.markdown("""
 <div class='instruction-box'>
-    <b>Fundamento del Modelo Estocástico (Simulación de Monte Carlo)</b><br><br>
     El presente aplicativo tiene como objetivo evaluar la viabilidad de mantener una reserva de tesorería equivalente a <b>20 días de operación continua</b> (estimada en $1,707 millones de COP). Debido a la incertidumbre inherente en los ciclos de recaudo (cartera vencida) y las fluctuaciones en la demanda de la flota tercerizada, el modelo genera 10,000 escenarios probabilísticos posibles para cada mes restante del año.<br><br>
     <b>Metodología de lectura:</b> El sistema se divide en dos módulos. El Módulo 1 proyecta la inercia financiera actual de Servitravel (qué sucederá si no se toman decisiones). El Módulo 2 permite a la junta directiva y a la gerencia activar estrategias específicas de ingeniería financiera para visualizar el impacto matemático directo sobre la caja libre y el ciclo de conversión de efectivo.
 </div>
