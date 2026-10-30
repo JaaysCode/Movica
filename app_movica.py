@@ -1,53 +1,48 @@
 # -----------------------------------------------------------------------------
-# 0. IMPORTACIÓN DE LIBRERÍAS
+# 0. INSTALACIÓN DE LIBRERÍAS E IMPORTACIÓN DE MÓDULOS
+# Ejecutar en terminal: pip install streamlit numpy pandas plotly
 # -----------------------------------------------------------------------------
 import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-# Configuración de la página
-st.set_page_config(page_title="Movica | Simulador", page_icon="🚌", layout="wide")
+# -----------------------------------------------------------------------------
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS CORPORATIVOS
+# -----------------------------------------------------------------------------
+st.set_page_config(page_title="Movica | Panel de Tesorería", layout="wide")
 
-# Ocultar el menú de Streamlit, el ícono de GitHub y el pie de página
-ocultar_menu = """
+# Estilos CSS basados en la paleta del reporte corporativo de Servitravel
+st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .viewerBadge_container__1QSob {display: none;}
+    .kpi-container { display: flex; gap: 15px; margin-bottom: 25px; }
+    .kpi-card {
+        flex: 1;
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 5px solid #186663; /* Teal corporativo */
+    }
+    .kpi-card.alert { border-left: 5px solid #CF8651; /* Naranja/Terracota corporativo */ }
+    .kpi-card.risk { border-left: 5px solid #D32F2F; /* Rojo alerta */ }
+    .kpi-card.neutral { border-left: 5px solid #637397; /* Gris pizarra corporativo */ }
+    .kpi-title { color: #637397; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+    .kpi-value { color: #1E293B; font-size: 28px; font-weight: bold; margin: 0; }
+    .kpi-desc { color: #9CA3AF; font-size: 11px; margin-top: 5px; }
+    .strategy-box {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    .strategy-title { font-weight: bold; color: #186663; font-size: 14px; margin-bottom: 5px; }
     </style>
-"""
-st.markdown(ocultar_menu, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 1. FUNCIÓN DE CONTRASEÑA
-# -----------------------------------------------------------------------------
-def check_password():
-    """Retorna True si el usuario ingresa la contraseña correcta."""
-    def password_entered():
-        if st.session_state["password"] == "Movica2026":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  #
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        st.markdown(" Acceso Restringido ")
-        st.text_input("Por favor, ingresa la contraseña para acceder al Simulador Financiero:",
-                      type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown(" Acceso Restringido ")
-        st.text_input("Por favor, ingresa la contraseña para acceder al Simulador Financiero:",
-                      type="password", on_change=password_entered, key="password")
-        st.error(" Contraseña incorrecta. Intenta nuevamente.")
-        return False
-    else:
-        return True
-
-# -----------------------------------------------------------------------------
-# 2. INGESTA DE DATOS HISTÓRICOS Y CONSTANTES (ENERO - AGOSTO 2026)
+# 2. INGESTA DE DATOS HISTÓRICOS Y CONSTANTES
 # -----------------------------------------------------------------------------
 MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago']
 V = np.array([2339.690875, 2512.919954, 2640.693165, 2690.628864, 2703.839974, 2427.660012, 2355.187919, 2678.096])
@@ -75,10 +70,16 @@ CD0, ADM0 = CD[-1] / V[-1], ADM[-1] / V[-1]
 YTD_V, YTD_RAI = V.sum(), RAI.sum()
 OTH = (OI - OG - CF - FAM).sum() / V.sum()
 DAILY_OUT = 85.354
+META_DIAS = 20
+META_CAJA_MONTO = META_DIAS * DAILY_OUT
 
 def lerp(a, b, k):
     return a + (b - a) * k / T
 
+# -----------------------------------------------------------------------------
+# 3. MOTOR DE SIMULACIÓN MONTE CARLO
+# -----------------------------------------------------------------------------
+@st.cache_data
 def run_monte_carlo(N, g_val, cd_val, adm_val, dso_val, dpo_val):
     rng = np.random.default_rng(2026)
     ks = np.arange(1, T + 1)
@@ -112,136 +113,94 @@ def run_monte_carlo(N, g_val, cd_val, adm_val, dso_val, dpo_val):
     pp = np.concatenate([np.full((N, 1), BAL_AGO['cxp']), cxp[:, :-1]], 1)
 
     cash = BAL_AGO['cash'] + np.cumsum(ni + DEP - (cxc - cp) + (cxp - pp), 1)
-
-    m4 = r.sum(1) / v.sum(1)
+    
     ann = (YTD_RAI + r.sum(1)) / (YTD_V + v.sum(1))
-
-    return v, r, cash, m4, ann
+    
+    return v, cash, ann, c, a
 
 # -----------------------------------------------------------------------------
-# 3. EJECUCIÓN CONDICIONAL DEL SIMULADOR (STREAMLIT)
+# 4. INTERFAZ DE USUARIO (DASHBOARD)
 # -----------------------------------------------------------------------------
-if check_password():
+st.title("Movica | Panel Estratégico de Gestión de Liquidez")
+st.markdown("Proyección estocástica orientada al aseguramiento de reservas operativas y mitigación de riesgo de impago.")
+
+# Panel lateral para parámetros
+with st.sidebar:
+    st.header("Parámetros de Simulación")
+    escenario = st.selectbox("Escenario Macroeconómico", ["Base", "Pesimista", "Optimista", "Personalizado"])
     
-    # Encabezado
-    st.markdown("""
-    <div style="background-color: #1e293b; padding: 15px; border-radius: 8px; color: white; font-family: sans-serif; margin-bottom: 15px;">
-        <h2 style="margin: 0; color: #ffffff;"> Movica | Simulador Financiero Interactivo</h2>
+    if escenario == "Base":
+        cd_val = st.slider("Costo Directo (% Vtas)", 88.0, 89.0, 88.5, 0.1)
+        adm_val = st.slider("Gastos Admin (% Vtas)", 8.0, 8.5, 8.24, 0.01)
+        dso_val = st.slider("Días Cartera (DSO)", 21.0, 22.0, 21.5, 0.5)
+        dpo_val = st.slider("Días Proveedores (DPO)", 14.0, 16.0, 15.0, 0.5)
+        g_val = st.slider("Crecimiento Mensual (%)", 0.0, 0.5, 0.2, 0.1)
+    elif escenario == "Pesimista":
+        cd_val = st.slider("Costo Directo (% Vtas)", 91.6, 93.0, 92.3, 0.1)
+        adm_val = st.slider("Gastos Admin (% Vtas)", 9.0, 9.5, 9.21, 0.01)
+        dso_val = st.slider("Días Cartera (DSO)", 25.0, 30.0, 27.5, 0.5)
+        dpo_val = st.slider("Días Proveedores (DPO)", 10.0, 12.0, 11.0, 0.5)
+        g_val = st.slider("Crecimiento Mensual (%)", -2.0, -1.0, -1.5, 0.1)
+    elif escenario == "Optimista":
+        cd_val = st.slider("Costo Directo (% Vtas)", 84.0, 85.0, 84.5, 0.1)
+        adm_val = st.slider("Gastos Admin (% Vtas)", 7.0, 7.6, 7.51, 0.01)
+        dso_val = st.slider("Días Cartera (DSO)", 18.0, 19.0, 18.5, 0.5)
+        dpo_val = st.slider("Días Proveedores (DPO)", 22.0, 25.0, 23.5, 0.5)
+        g_val = st.slider("Crecimiento Mensual (%)", 1.5, 2.5, 2.0, 0.1)
+    else:
+        cd_val = st.slider("Costo Directo (% Vtas)", 80.0, 95.0, 88.5, 0.1)
+        adm_val = st.slider("Gastos Admin (% Vtas)", 5.0, 12.0, 8.24, 0.1)
+        dso_val = st.slider("Días Cartera (DSO)", 10.0, 60.0, 21.5, 1.0)
+        dpo_val = st.slider("Días Proveedores (DPO)", 5.0, 30.0, 15.0, 1.0)
+        g_val = st.slider("Crecimiento Mensual (%)", -5.0, 5.0, 0.2, 0.1)
+
+    simulaciones = st.selectbox("Iteraciones (Monte Carlo)", [5000, 10000, 20000], index=1)
+
+# Ejecución del modelo
+v_mc, cash_mc, ann_mc, c_mc, a_mc = run_monte_carlo(simulaciones, g_val / 100, cd_val / 100, adm_val / 100, dso_val, dpo_val)
+
+# Cálculos para Tarjetas KPI
+prob_meta = (cash_mc[:, -1] >= META_CAJA_MONTO).mean() * 100
+costos_totales_proyectados = (c_mc.mean() + a_mc.mean()) / v_mc.mean() * 100
+cash_p50 = np.percentile(cash_mc[:, -1], 50)
+dias_caja_proyectados = cash_p50 / DAILY_OUT
+
+# Renderizado de Tarjetas KPI
+st.markdown("""
+<div class="kpi-container">
+    <div class="kpi-card">
+        <div class="kpi-title">Monto Objetivo (20 Días)</div>
+        <div class="kpi-value">${:,.1f} M</div>
+        <div class="kpi-desc">Equivalente a 20 días de operación a $85.3M/día.</div>
     </div>
-    """, unsafe_allow_html=True)
-    
-    # Tabla de Información Estratégica
-    st.markdown("""
-    <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 20px; font-family: sans-serif; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <h4 style="margin-top: 0; color: #1e293b; font-size: 14px;"> Guía de Parametrización Estratégica</h4>
-        <p style="font-size: 13px; color: #475569; margin-bottom: 10px;">Para asegurar una toma de decisiones informada y fundamentada en el diagnóstico financiero corporativo, las variables de simulación se encuentran restringidas a los siguientes rangos operativos según el escenario seleccionado:</p>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; color: #1e293b;">
-            <thead>
-                <tr style="background-color: #e2e8f0; border-bottom: 2px solid #cbd5e1;">
-                    <th style="padding: 8px;">Variable de Control</th>
-                    <th style="padding: 8px;">Escenario Base</th>
-                    <th style="padding: 8px;">Escenario Optimista</th>
-                    <th style="padding: 8px;">Escenario Pesimista</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px; font-weight: bold;">Costo Directo (% Vtas)</td>
-                    <td style="padding: 8px;">88.0% - 89.0%</td>
-                    <td style="padding: 8px;">84.0% - 85.0%</td>
-                    <td style="padding: 8px;">91.6% - 93.0%</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px; font-weight: bold;">Gastos Admin (% Vtas)</td>
-                    <td style="padding: 8px;">8.0% - 8.5%</td>
-                    <td style="padding: 8px;">7.0% - 7.6%</td>
-                    <td style="padding: 8px;">9.0% - 9.5%</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px; font-weight: bold;">Crecimiento Mensual (%)</td>
-                    <td style="padding: 8px;">0.0% - 0.5%</td>
-                    <td style="padding: 8px;">1.5% - 2.5%</td>
-                    <td style="padding: 8px;">-1.0% - -2.0%</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px; font-weight: bold;">Días Cartera (DSO)</td>
-                    <td style="padding: 8px;">21 - 22 días</td>
-                    <td style="padding: 8px;">18 - 19 días</td>
-                    <td style="padding: 8px;">25 - 30 días</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; font-weight: bold;">Días Proveedores (DPO)</td>
-                    <td style="padding: 8px;">14 - 16 días</td>
-                    <td style="padding: 8px;">22 - 25 días</td>
-                    <td style="padding: 8px;">10 - 12 días</td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="kpi-card neutral">
+        <div class="kpi-title">Probabilidad de Cumplimiento</div>
+        <div class="kpi-value">{:.1f}%</div>
+        <div class="kpi-desc">Certeza estadística de alcanzar la meta a diciembre.</div>
     </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("**Panel de Control de Variables (Ajusta los parámetros):**")
-
-    # Controles Interactivos de Streamlit
-    escenario = st.selectbox('Escenario Predefinido:', ['Base', 'Pesimista', 'Optimista', 'Personalizado'])
-
-    # Dinámica de Rangos según el escenario
-    if escenario == 'Base':
-        limites = {'cd': (88.0, 89.0, 88.5), 'adm': (8.0, 8.5, 8.24), 'g': (0.0, 0.5, 0.2), 'dso': (21.0, 22.0, 21.5), 'dpo': (14.0, 16.0, 15.0)}
-    elif escenario == 'Pesimista':
-        limites = {'cd': (91.6, 93.0, 92.3), 'adm': (9.0, 9.5, 9.21), 'g': (-2.0, -1.0, -1.5), 'dso': (25.0, 30.0, 27.5), 'dpo': (10.0, 12.0, 11.0)}
-    elif escenario == 'Optimista':
-        limites = {'cd': (84.0, 85.0, 84.5), 'adm': (7.0, 7.6, 7.51), 'g': (1.5, 2.5, 2.0), 'dso': (18.0, 19.0, 18.5), 'dpo': (22.0, 25.0, 23.5)}
-    else: # Personalizado
-        limites = {'cd': (80.0, 95.0, 88.5), 'adm': (5.0, 12.0, 8.24), 'g': (-5.0, 5.0, 0.2), 'dso': (10.0, 60.0, 21.5), 'dpo': (5.0, 30.0, 15.0)}
-
-    col1, col2 = st.columns(2)
-    with col1:
-        cd = st.slider('Costo Directo (% Vtas):', min_value=limites['cd'][0], max_value=limites['cd'][1], value=limites['cd'][2], step=0.1)
-        g = st.slider('Crecimiento Mensual (%):', min_value=limites['g'][0], max_value=limites['g'][1], value=limites['g'][2], step=0.1)
-        dso = st.slider('Días Cartera (DSO):', min_value=limites['dso'][0], max_value=limites['dso'][1], value=limites['dso'][2], step=0.5)
-    with col2:
-        adm = st.slider('Gastos Admin (% Vtas):', min_value=limites['adm'][0], max_value=limites['adm'][1], value=limites['adm'][2], step=0.01)
-        sim = st.selectbox('N° Simulaciones:', [1000, 5000, 10000, 20000], index=2)
-        dpo = st.slider('Días Proveedores (DPO):', min_value=limites['dpo'][0], max_value=limites['dpo'][1], value=limites['dpo'][2], step=0.5)
-
-    # 4. EJECUCIÓN Y RENDERIZADO (Se ejecuta automáticamente en Streamlit)
-    v_mc, r_mc, cash_mc, m4_mc, ann_mc = run_monte_carlo(sim, g / 100, cd / 100, adm / 100, dso, dpo)
-
-    prob_margen_5 = (ann_mc >= 0.05).mean() * 100
-    prob_meta_caja = (cash_mc[:, -1] >= (20 * DAILY_OUT)).mean() * 100
-    prob_deficit = (cash_mc.min(1) < 0).mean() * 100
-    cash_p50 = np.percentile(cash_mc[:, -1], 50)
-
-    # Tarjetas KPI
-    st.markdown(f"""
-    <div style="display: flex; gap: 15px; margin-top: 10px; margin-bottom: 20px; font-family: sans-serif;">
-        <div style="flex: 1; background: #ffffff; padding: 15px; border-radius: 8px; border-left: 5px solid #1f77b4; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="font-size: 11px; color: #6c757d; font-weight: bold;">PROB. MARGEN NETO ≥ 5%</div>
-            <div style="font-size: 24px; font-weight: bold; color: #1e293b;">{prob_margen_5:.1f}%</div>
-            <div style="font-size: 11px; color: {'#10b981' if prob_margen_5 > 50 else '#ef4444'}; font-weight: bold;">Meta Anual Corporativa</div>
-        </div>
-        <div style="flex: 1; background: #ffffff; padding: 15px; border-radius: 8px; border-left: 5px solid #10b981; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="font-size: 11px; color: #6c757d; font-weight: bold;">PROB. CAJA ≥ 20 DÍAS</div>
-            <div style="font-size: 24px; font-weight: bold; color: #1e293b;">{prob_meta_caja:.1f}%</div>
-            <div style="font-size: 11px; color: {'#10b981' if prob_meta_caja > 50 else '#ef4444'}; font-weight: bold;">Cobertura ($1,707M)</div>
-        </div>
-        <div style="flex: 1; background: #ffffff; padding: 15px; border-radius: 8px; border-left: 5px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="font-size: 11px; color: #6c757d; font-weight: bold;">PROB. DÉFICIT DE CAJA</div>
-            <div style="font-size: 24px; font-weight: bold; color: #1e293b;">{prob_deficit:.1f}%</div>
-            <div style="font-size: 11px; color: {'#10b981' if prob_deficit < 5 else '#ef4444'}; font-weight: bold;">Riesgo de Caja &lt; $0</div>
-        </div>
-        <div style="flex: 1; background: #ffffff; padding: 15px; border-radius: 8px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="font-size: 11px; color: #6c757d; font-weight: bold;">CAJA PROYECTADA (DIC P50)</div>
-            <div style="font-size: 24px; font-weight: bold; color: #1e293b;">${cash_p50:,.0f}M</div>
-            <div style="font-size: 11px; color: #10b981; font-weight: bold;">Millones COP Disponibles</div>
-        </div>
+    <div class="kpi-card alert">
+        <div class="kpi-title">Equivalencia en Cartera (DSO)</div>
+        <div class="kpi-value">{:.1f} Días</div>
+        <div class="kpi-desc">Días de recaudo simulados (Histórico: 44.6 días).</div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="kpi-card risk">
+        <div class="kpi-title">Carga de Costos Supuestos</div>
+        <div class="kpi-value">{:.1f}%</div>
+        <div class="kpi-desc">Suma ponderada de admin, flota propia y tercerización.</div>
+    </div>
+</div>
+""".format(META_CAJA_MONTO, prob_meta, dso_val, costos_totales_proyectados), unsafe_allow_html=True)
 
-    # Gráfico Plotly
+# -----------------------------------------------------------------------------
+# 5. VISUALIZACIÓN GRÁFICA Y ESTRATEGIAS
+# -----------------------------------------------------------------------------
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("Trayectoria de Caja Proyectada")
     percentiles = np.percentile(cash_mc, [5, 25, 50, 75, 95], axis=0)
     ejes_x = ['Ago (Real)', 'Sep', 'Oct', 'Nov', 'Dic']
+    
     p5 = np.insert(percentiles[0], 0, BAL_AGO['cash'])
     p25 = np.insert(percentiles[1], 0, BAL_AGO['cash'])
     p50 = np.insert(percentiles[2], 0, BAL_AGO['cash'])
@@ -250,17 +209,62 @@ if check_password():
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=ejes_x, y=p95, mode='lines', line=dict(width=0), showlegend=False))
-    fig.add_trace(go.Scatter(x=ejes_x, y=p5, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(31, 119, 180, 0.15)', name='Rango P5 - P95 (90% Confianza)'))
+    fig.add_trace(go.Scatter(x=ejes_x, y=p5, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(24, 102, 99, 0.1)', name='Rango 90%'))
     fig.add_trace(go.Scatter(x=ejes_x, y=p75, mode='lines', line=dict(width=0), showlegend=False))
-    fig.add_trace(go.Scatter(x=ejes_x, y=p25, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(31, 119, 180, 0.30)', name='Rango P25 - P75 (50% Confianza)'))
-    fig.add_trace(go.Scatter(x=ejes_x, y=p50, mode='lines+markers', line=dict(color='#1f77b4', width=3), name='Mediana (P50)'))
-    fig.add_hline(y=(20 * DAILY_OUT), line_dash="dash", line_color="#ef4444", annotation_text="Meta 20 Días de Caja ($1,707M)", annotation_position="top left") 
-
-    fig.update_layout(
-        title="Trayectoria de Caja Proyectada — Simulación Monte Carlo",
-        xaxis_title="Mes", yaxis_title="Efectivo Disponible (COP Millones)",
-        hovermode="x unified", template="plotly_white", height=420, margin=dict(l=20, r=20, t=40, b=20)
-    )
+    fig.add_trace(go.Scatter(x=ejes_x, y=p25, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(24, 102, 99, 0.25)', name='Rango 50%'))
+    fig.add_trace(go.Scatter(x=ejes_x, y=p50, mode='lines+markers', line=dict(color='#186663', width=3), name='Mediana (P50)'))
     
-    # Se renderiza en Streamlit
+    fig.add_hline(y=META_CAJA_MONTO, line_dash="dash", line_color="#D32F2F", annotation_text=f"Meta: {META_DIAS} Días", annotation_position="top left")
+    
+    fig.update_layout(
+        xaxis_title="Período", yaxis_title="Liquidez (COP Millones)",
+        hovermode="x unified", template="plotly_white", height=450, margin=dict(l=20, r=20, t=40, b=20)
+    )
     st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+    st.subheader("Manual de Ejecución Estratégica")
+    st.markdown(f"""
+    <div style="height: 450px; overflow-y: auto; padding-right: 10px;">
+        <div class="strategy-box">
+            <div class="strategy-title">1. Reingeniería de Pagos (Confirming)</div>
+            Extender cuentas por pagar reteniendo efectivo internamente sin afectar la cadena de suministro, mitigando la brecha temporal entre cobro y pago.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">2. Abono Mínimo Innegociable</div>
+            Fragmentar pagos altos de clientes de tardío pago mediante contacto cada 8 días. La prórroga se condiciona a un desembolso parcial del 20-30%.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">3. Factoraje Selectivo</div>
+            Venta de cartera de los rubros más altos sin recurso, asumiendo el descuento financiero para inyectar liquidez inmediata a la reserva de 20 días.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">4. Optimización Estructural Híbrida</div>
+            Consolidar los costos administrativos (800) y de flota/tercerización (1700) bajo un modelo Pay-when-Paid, indexando el pago logístico al recaudo final.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">5. Distribución de Capacidad (Noviembre)</div>
+            Reemplazar el contrato principal saliente atomizando el riesgo operativo entre 3 o 4 clientes medianos con políticas de recaudo estrictas de 15 a 20 días.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">6. Scoring de Riesgo Crediticio</div>
+            Agrupación bidimensional cruzando volumen de facturación y días de mora. Clientes en el cuartil de riesgo alto requieren garantías reales para operar.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">7. Cobro Bipartito B2B</div>
+            Estructuración de contratos nuevos exigiendo anticipos operativos del 30% al 40% para fondear la operación logística directa sin tocar el flujo de caja diario.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">8. Descuentos Dinámicos (Pronto Pago)</div>
+            Reemplazar el cobro de intereses moratorios inefectivos por incentivos decrecientes de pago rápido, monetizando la agilidad de los clientes corporativos.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">9. Cash Pooling Restrictivo</div>
+            Implementar barrido de saldos diario aislando entre 1 y 2 días operativos hacia el fondo a la vista, hasta lograr progresivamente el piso de ${META_CAJA_MONTO:,.0f}M.
+        </div>
+        <div class="strategy-box">
+            <div class="strategy-title">10. Cobertura de Riesgo Cruzado</div>
+            Auditoría de capacidad financiera de proveedores críticos y adquisición de seguro de crédito comercial para cuentas por cobrar con alta exposición.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
