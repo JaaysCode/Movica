@@ -42,11 +42,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# AUTENTICACIÓN Y SEGURIDAD
+# 2. AUTENTICACIÓN Y SEGURIDAD
 # -----------------------------------------------------------------------------
 def check_password():
     def password_entered():
-        if st.session_state["pwd_input"] == st.secrets["password"]:
+        if st.session_state["pwd_input"] == "Movica2026":
             st.session_state["password_correct"] = True
             del st.session_state["pwd_input"] 
         else:
