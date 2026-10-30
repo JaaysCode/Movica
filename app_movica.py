@@ -149,13 +149,11 @@ st.markdown("""
 st.markdown("<div class='section-title'>Módulo 1: Proyección de Tesorería por Escenario de Mercado</div>", unsafe_allow_html=True)
 
 with st.expander("Panel de Control de Escenarios (Ajuste de Parámetros)", expanded=True):
-    # Selector de Escenario integrado
     escenario = st.selectbox("Seleccione el Escenario Macroeconómico a Evaluar:", 
                              ['Personalizado', 'Base', 'Pesimista', 'Optimista'], index=0)
     
     st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
     
-    # Lógica de rangos según escenario seleccionado
     if escenario == 'Base':
         cd_min, cd_max, cd_val = 88.0, 89.0, 88.5
         adm_min, adm_max, adm_val = 8.0, 8.5, 8.24
@@ -174,14 +172,13 @@ with st.expander("Panel de Control de Escenarios (Ajuste de Parámetros)", expan
         g_min, g_max, g_val_pct = 1.5, 2.5, 2.0
         dso_min, dso_max, dso_val = 18.0, 19.0, 18.5
         dpo_min, dpo_max, dpo_val = 22.0, 25.0, 23.5
-    else: # Personalizado (Valores reales inerciales a Agosto como punto de partida)
+    else: 
         cd_min, cd_max, cd_val = 80.0, 95.0, 88.5
         adm_min, adm_max, adm_val = 5.0, 12.0, 8.24
         g_min, g_max, g_val_pct = -5.0, 5.0, 0.2
         dso_min, dso_max, dso_val = 10.0, 60.0, 44.6
         dpo_min, dpo_max, dpo_val = 3.0, 45.0, 3.3
 
-    # Renderizado de los controles dinámicos
     col_param1, col_param2, col_param3 = st.columns(3)
     with col_param1:
         cd_base = st.slider("Costo Directo (% Vtas)", min_value=cd_min, max_value=cd_max, value=cd_val, step=0.1) / 100
@@ -193,7 +190,6 @@ with st.expander("Panel de Control de Escenarios (Ajuste de Parámetros)", expan
         g_base = st.slider("Crecimiento Mensual (%)", min_value=g_min, max_value=g_max, value=g_val_pct, step=0.1) / 100
         simulaciones = st.selectbox("Iteraciones (Precisión Monte Carlo)", [5000, 10000, 20000], index=1)
 
-# Ejecución del Modelo con Escenario Base/Elegido
 v_base_arr, cash_base_arr, ann_base_arr, c_base_arr, a_base_arr = run_monte_carlo(simulaciones, g_base, cd_base, adm_base, dso_base, dpo_base)
 caja_base_dic_p50 = np.percentile(cash_base_arr[:, -1], 50)
 prob_meta_base = (cash_base_arr[:, -1] >= META_CAJA_MONTO).mean() * 100
@@ -225,7 +221,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Gráfico del Escenario Seleccionado
 percentiles_base = np.percentile(cash_base_arr, [5, 25, 50, 75, 95], axis=0)
 ejes_x = ['Ago (Real)', 'Sep', 'Oct', 'Nov', 'Dic']
 p5_base = np.insert(percentiles_base[0], 0, BAL_AGO['cash'])
@@ -253,64 +248,43 @@ st.markdown("<div class='section-title'>Módulo 2: Simulador de Impacto de Estra
 st.markdown("""
 <div class='instruction-box'>
     <b>Instructivo de Intervención Estratégica</b><br><br>
-    Las siguientes 10 estrategias han sido diseñadas para abordar la concentración del riesgo en clientes de alto volumen y tardío pago, integrando los costos de flota propia (800) y tercerizada (1700). Cada estrategia seleccionada alterará matemáticamente el escenario definido en el <b>Módulo 1</b>: algunas liberarán liquidez reduciendo los días de cartera (DSO) o extendiendo los días de pago (DPO), mientras que otras implicarán un costo asociado (incremento en gastos financieros/administrativos). <br><br>
-    <b>Seleccione las estrategias en las casillas correspondientes para observar el recálculo dinámico y la liberación de liquidez en el panel inferior.</b>
+    Las siguientes 5 estrategias han sido diseñadas para abordar la concentración del riesgo en clientes de alto volumen y tardío pago. Cada estrategia seleccionada alterará matemáticamente el escenario definido en el <b>Módulo 1</b>: algunas liberarán liquidez acelerando los días de cartera (DSO), mientras que otras implicarán un costo asociado (incremento en gastos financieros/administrativos). <br><br>
+    <b>Seleccione las estrategias en las casillas correspondientes para observar el recálculo dinámico y la liberación de liquidez en el panel de KPIs inferior.</b>
 </div>
 """, unsafe_allow_html=True)
 
 col_strat1, col_strat2 = st.columns(2)
 
 with col_strat1:
-    st.markdown("<div class='strategy-desc-box'><b>1. Reingeniería de Pagos (Confirming)</b><br>Programa bancario para pagar a proveedores sin utilizar flujo propio inmediato. <i>Efecto: Aumenta los días de pago (DPO) en 15 días, reteniendo liquidez.</i></div>", unsafe_allow_html=True)
+    st.markdown("<div class='strategy-desc-box'><b>1. Abono Mínimo Innegociable (Cobro cada 8 días)</b><br>Exigencia de pagos parciales para fragmentar el riesgo en la línea corporativa. <i>Efecto: Reduce la cartera general (DSO) en 4 días orgánicos.</i></div>", unsafe_allow_html=True)
     s1 = st.checkbox("Aplicar Estrategia 1")
     
-    st.markdown("<div class='strategy-desc-box'><b>2. Abono Mínimo Innegociable (Cobro cada 8 días)</b><br>Exigencia de pagos parciales para fragmentar el riesgo en la línea corporativa. <i>Efecto: Reduce la cartera general (DSO) en 4 días orgánicos.</i></div>", unsafe_allow_html=True)
+    st.markdown("<div class='strategy-desc-box'><b>2. Distribución de Capacidad (Sustitución de Contrato)</b><br>Atomizar operaciones hacia múltiples clientes medianos en lugar de uno grande. <i>Efecto: Aumenta crecimiento de ventas 1.0% y acelera recaudo (DSO -2 días).</i></div>", unsafe_allow_html=True)
     s2 = st.checkbox("Aplicar Estrategia 2")
     
-    st.markdown("<div class='strategy-desc-box'><b>3. Factoraje Selectivo (Venta de Cartera)</b><br>Liquidación de facturas altas mediante entidades financieras. <i>Efecto: Reducción drástica de cartera (DSO -12 días), pero incrementa el Gasto Admin en 0.5% por comisión.</i></div>", unsafe_allow_html=True)
+    st.markdown("<div class='strategy-desc-box'><b>3. Scoring de Riesgo Crediticio</b><br>Restricción de servicios a clientes en cuartil de mora alta sin garantías reales. <i>Efecto: Mejora la calidad de la cartera reduciendo el DSO en 3 días.</i></div>", unsafe_allow_html=True)
     s3 = st.checkbox("Aplicar Estrategia 3")
-    
-    st.markdown("<div class='strategy-desc-box'><b>4. Optimización Estructural Híbrida (Pay-when-Paid)</b><br>Indexar el pago logístico al recaudo efectivo del cliente final. <i>Efecto: Traslado temporal de riesgo, reduce el Costo Directo efectivo en 1.0%.</i></div>", unsafe_allow_html=True)
-    s4 = st.checkbox("Aplicar Estrategia 4")
-    
-    st.markdown("<div class='strategy-desc-box'><b>5. Distribución de Capacidad (Sustitución de Contrato)</b><br>Atomizar operaciones hacia múltiples clientes medianos en lugar de uno grande. <i>Efecto: Aumenta crecimiento de ventas 1.0% y acelera recaudo (DSO -2 días).</i></div>", unsafe_allow_html=True)
-    s5 = st.checkbox("Aplicar Estrategia 5")
 
 with col_strat2:
-    st.markdown("<div class='strategy-desc-box'><b>6. Scoring de Riesgo Crediticio</b><br>Restricción de servicios a clientes en cuartil de mora alta sin garantías reales. <i>Efecto: Mejora la calidad de la cartera reduciendo el DSO en 3 días.</i></div>", unsafe_allow_html=True)
-    s6 = st.checkbox("Aplicar Estrategia 6")
+    st.markdown("<div class='strategy-desc-box'><b>4. Cobro Bipartito B2B (Anticipos)</b><br>Exigencia de anticipo operativo (30-40%) para nuevas renovaciones corporativas. <i>Efecto: Impacto profundo en liquidez inicial (DSO -10 días).</i></div>", unsafe_allow_html=True)
+    s4 = st.checkbox("Aplicar Estrategia 4")
     
-    st.markdown("<div class='strategy-desc-box'><b>7. Cobro Bipartito B2B (Anticipos)</b><br>Exigencia de anticipo operativo (30-40%) para nuevas renovaciones corporativas. <i>Efecto: Impacto profundo en liquidez inicial (DSO -10 días).</i></div>", unsafe_allow_html=True)
-    s7 = st.checkbox("Aplicar Estrategia 7")
-    
-    st.markdown("<div class='strategy-desc-box'><b>8. Descuentos Dinámicos por Pronto Pago</b><br>Sustitución del interés moratorio por incentivos decrecientes. <i>Efecto: Acelera pagos (DSO -5 días), asumiendo un costo financiero extra (Admin +0.3%).</i></div>", unsafe_allow_html=True)
-    s8 = st.checkbox("Aplicar Estrategia 8")
-    
-    st.markdown("<div class='strategy-desc-box'><b>9. Cash Pooling Restrictivo (Sweeping)</b><br>Barrido bancario automatizado para consolidar reservas. <i>Efecto: Aísla y asegura matemáticamente una suma fija mínima de $60M al cierre del modelo.</i></div>", unsafe_allow_html=True)
-    s9 = st.checkbox("Aplicar Estrategia 9")
-    
-    st.markdown("<div class='strategy-desc-box'><b>10. Seguro de Crédito Comercial</b><br>Póliza contra impago de la línea empresarial principal. <i>Efecto: Elimina la varianza extrema de pérdida, adiciona un costo de prima (Admin +0.4%).</i></div>", unsafe_allow_html=True)
-    s10 = st.checkbox("Aplicar Estrategia 10")
+    st.markdown("<div class='strategy-desc-box'><b>5. Descuentos Dinámicos por Pronto Pago</b><br>Sustitución del interés moratorio por incentivos decrecientes. <i>Efecto: Acelera pagos (DSO -5 días), asumiendo un costo financiero extra (Admin +0.3%).</i></div>", unsafe_allow_html=True)
+    s5 = st.checkbox("Aplicar Estrategia 5")
 
 # Lógica de alteración de variables basada en el escenario seleccionado en el Módulo 1
-dso_mod, dpo_mod, cd_mod, adm_mod, g_mod, reserva_fija = dso_base, dpo_base, cd_base, adm_base, g_base, 0
+dso_mod, dpo_mod, cd_mod, adm_mod, g_mod = dso_base, dpo_base, cd_base, adm_base, g_base
 
-if s1: dpo_mod += 15.0
-if s2: dso_mod -= 4.0
-if s3: dso_mod -= 12.0; adm_mod += 0.005
-if s4: cd_mod -= 0.010
-if s5: g_mod += 0.010; dso_mod -= 2.0
-if s6: dso_mod -= 3.0
-if s7: dso_mod -= 10.0
-if s8: dso_mod -= 5.0; adm_mod += 0.003
-if s9: reserva_fija = 60.0
-if s10: adm_mod += 0.004
+if s1: dso_mod -= 4.0
+if s2: g_mod += 0.010; dso_mod -= 2.0
+if s3: dso_mod -= 3.0
+if s4: dso_mod -= 10.0
+if s5: dso_mod -= 5.0; adm_mod += 0.003
 
-dso_mod = max(1.0, dso_mod) # Límite para que la cartera nunca sea 0 o negativa
+dso_mod = max(1.0, dso_mod) 
 
 # Ejecución Optimizada
 v_mod_arr, cash_mod_arr, ann_mod_arr, c_mod_arr, a_mod_arr = run_monte_carlo(simulaciones, g_mod, cd_mod, adm_mod, dso_mod, dpo_mod)
-cash_mod_arr[:, -1] += reserva_fija 
 caja_mod_dic_p50 = np.percentile(cash_mod_arr[:, -1], 50)
 
 # Deltas y nuevos cálculos comparativos
@@ -351,24 +325,3 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# Gráfico Comparativo Final
-percentiles_mod = np.percentile(cash_mod_arr, [5, 25, 50, 75, 95], axis=0)
-p5_mod = np.insert(percentiles_mod[0], 0, BAL_AGO['cash'])
-p25_mod = np.insert(percentiles_mod[1], 0, BAL_AGO['cash'])
-p50_mod = np.insert(percentiles_mod[2], 0, BAL_AGO['cash'])
-p75_mod = np.insert(percentiles_mod[3], 0, BAL_AGO['cash'])
-p95_mod = np.insert(percentiles_mod[4], 0, BAL_AGO['cash'])
-
-fig_comp = go.Figure()
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p95_mod, mode='lines', line=dict(width=0), showlegend=False))
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p5_mod, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(24, 102, 99, 0.15)', name='Rango 90% (Optimizado)'))
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p75_mod, mode='lines', line=dict(width=0), showlegend=False))
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p25_mod, mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(24, 102, 99, 0.3)', name='Rango 50% (Optimizado)'))
-
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p50_base, mode='lines+markers', line=dict(color='#CF8651', width=3, dash='dot'), name=f'Escenario {escenario} (Sin Estrategias)'))
-fig_comp.add_trace(go.Scatter(x=ejes_x, y=p50_mod, mode='lines+markers', line=dict(color='#186663', width=3), name='Proyección Optimizada (Con Estrategias)'))
-fig_comp.add_hline(y=META_CAJA_MONTO, line_dash="dash", line_color="#D32F2F", annotation_text="Línea de Meta (20 Días)", annotation_position="top left")
-
-fig_comp.update_layout(yaxis_title="Disponibilidad de Caja (COP Millones)", hovermode="x unified", template="plotly_white", height=450, margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-st.plotly_chart(fig_comp, use_container_width=True)
